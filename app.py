@@ -3,27 +3,23 @@ import io
 import zipfile
 import shutil
 import uuid
+import tempfile
 
 from flask import Flask, request, send_file, render_template, jsonify
 from PIL import Image, ImageOps, ImageDraw
 
 app = Flask(__name__)
 
-TEMP_DIR   = os.path.join(os.path.dirname(__file__), "temp")
-OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "output")
-
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif"}
 
 # ── A4 layout constants (300 DPI) ──────────────────────────────
-A4_W, A4_H   = 2480, 3508  # pixels at 300 DPI
-A4_MARGIN    = 100          # px, all sides
-A4_GAP       = 40           # px between polaroids
+A4_W, A4_H   = 2480, 3508
+A4_MARGIN    = 100
+A4_GAP       = 40
 A4_COLS      = 3
-# Each polaroid width in the grid:
-A4_POL_W = (A4_W - 2 * A4_MARGIN - (A4_COLS - 1) * A4_GAP) // A4_COLS   # ≈ 733 px
-# Height: ratio 1.35/1.2 = 1.125
-A4_POL_H = round(A4_POL_W * (1.35 / 1.2))                                 # ≈ 825 px
-A4_ROWS  = (A4_H - 2 * A4_MARGIN + A4_GAP) // (A4_POL_H + A4_GAP)        # ≈ 3 rows
+A4_POL_W = (A4_W - 2 * A4_MARGIN - (A4_COLS - 1) * A4_GAP) // A4_COLS
+A4_POL_H = round(A4_POL_W * (1.35 / 1.2))
+A4_ROWS  = (A4_H - 2 * A4_MARGIN + A4_GAP) // (A4_POL_H + A4_GAP)
 
 
 def allowed_file(filename: str) -> bool:
@@ -34,20 +30,17 @@ def make_polaroid(img: Image.Image) -> Image.Image:
     """Return a Polaroid-bordered PIL Image (in memory)."""
     img = ImageOps.exif_transpose(img).convert("RGB")
 
-    # Square center-crop
     min_side = min(img.width, img.height)
     left = (img.width  - min_side) // 2
     top  = (img.height - min_side) // 2
     img  = img.crop((left, top, left + min_side, top + min_side))
     S    = min_side
 
-    # Canvas: 1.2W × 1.35H
     canvas_w = round(S * 1.2)
     canvas_h = round(S * 1.35)
     canvas   = Image.new("RGB", (canvas_w, canvas_h), (255, 255, 255))
     canvas.paste(img, (round(S * 0.1), round(S * 0.1)))
 
-    # Grey cross cut-marks at each corner
     draw        = ImageDraw.Draw(canvas)
     cross_color = (128, 128, 128)
     span        = 10
@@ -80,18 +73,6 @@ def make_a4_pages(polaroids: list) -> list:
     return pages
 
 
-def ensure_dirs():
-    os.makedirs(TEMP_DIR,   exist_ok=True)
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-
-def cleanup_dirs():
-    for d in (TEMP_DIR, OUTPUT_DIR):
-        if os.path.isdir(d):
-            shutil.rmtree(d)
-            os.makedirs(d)
-
-
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -99,76 +80,79 @@ def index():
 
 @app.route("/upload", methods=["POST"])
 def upload():
-    ensure_dirs()
-
     files  = request.files.getlist("images")
-    layout = request.form.get("layout", "individual")  # individual | a4 | both
+    layout = request.form.get("layout", "individual")
 
     if not files or all(f.filename == "" for f in files):
         return jsonify({"error": "No files uploaded."}), 400
 
-    polaroids_mem = []  # list of (base_name, PIL Image)
+    # Per-request isolated temp directory — works locally and on Vercel (/tmp)
+    work_dir   = tempfile.mkdtemp()
+    temp_dir   = os.path.join(work_dir, "temp")
+    output_dir = os.path.join(work_dir, "output")
+    os.makedirs(temp_dir)
+    os.makedirs(output_dir)
 
-    for f in files:
-        if not allowed_file(f.filename):
-            continue
+    try:
+        polaroids_mem = []
 
-        ext       = f.filename.rsplit(".", 1)[1].lower()
-        temp_path = os.path.join(TEMP_DIR, f"{uuid.uuid4().hex}.{ext}")
-        f.save(temp_path)
+        for f in files:
+            if not allowed_file(f.filename):
+                continue
 
-        try:
-            with Image.open(temp_path) as img:
-                polaroid = make_polaroid(img)
-            base = os.path.splitext(f.filename)[0]
-            polaroids_mem.append((base, polaroid))
-        except Exception as e:
-            app.logger.error(f"Failed to process {f.filename}: {e}")
+            ext       = f.filename.rsplit(".", 1)[1].lower()
+            temp_path = os.path.join(temp_dir, f"{uuid.uuid4().hex}.{ext}")
+            f.save(temp_path)
 
-    if not polaroids_mem:
-        cleanup_dirs()
-        return jsonify({"error": "No valid images could be processed."}), 422
+            try:
+                with Image.open(temp_path) as img:
+                    polaroid = make_polaroid(img)
+                base = os.path.splitext(f.filename)[0]
+                polaroids_mem.append((base, polaroid))
+            except Exception as e:
+                app.logger.error(f"Failed to process {f.filename}: {e}")
 
-    output_paths = []
+        if not polaroids_mem:
+            return jsonify({"error": "No valid images could be processed."}), 422
 
-    # ── Individual Polaroid JPEGs ──────────────────────────────
-    if layout in ("individual", "both"):
-        for base, pol in polaroids_mem:
-            out_name = f"{base}_polaroid.jpg"
-            out_path = os.path.join(OUTPUT_DIR, out_name)
-            counter  = 1
-            while os.path.exists(out_path):
-                out_path = os.path.join(OUTPUT_DIR, f"{base}_polaroid_{counter}.jpg")
-                counter += 1
-            pol.save(out_path, "JPEG", quality=95)
-            output_paths.append(out_path)
+        output_paths = []
 
-    # ── A4 print sheets ────────────────────────────────────────
-    if layout in ("a4", "both"):
-        pil_list = [pol for _, pol in polaroids_mem]
-        a4_pages = make_a4_pages(pil_list)
-        for i, page in enumerate(a4_pages, 1):
-            out_path = os.path.join(OUTPUT_DIR, f"a4_page_{i:02d}.jpg")
-            page.save(out_path, "JPEG", quality=95)
-            output_paths.append(out_path)
+        if layout in ("individual", "both"):
+            for base, pol in polaroids_mem:
+                out_name = f"{base}_polaroid.jpg"
+                out_path = os.path.join(output_dir, out_name)
+                counter  = 1
+                while os.path.exists(out_path):
+                    out_path = os.path.join(output_dir, f"{base}_polaroid_{counter}.jpg")
+                    counter += 1
+                pol.save(out_path, "JPEG", quality=95)
+                output_paths.append(out_path)
 
-    # ── ZIP and send ───────────────────────────────────────────
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        for path in output_paths:
-            zf.write(path, arcname=os.path.basename(path))
-    zip_buffer.seek(0)
+        if layout in ("a4", "both"):
+            pil_list = [pol for _, pol in polaroids_mem]
+            a4_pages = make_a4_pages(pil_list)
+            for i, page in enumerate(a4_pages, 1):
+                out_path = os.path.join(output_dir, f"a4_page_{i:02d}.jpg")
+                page.save(out_path, "JPEG", quality=95)
+                output_paths.append(out_path)
 
-    cleanup_dirs()
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            for path in output_paths:
+                zf.write(path, arcname=os.path.basename(path))
+        zip_buffer.seek(0)
 
-    return send_file(
-        zip_buffer,
-        mimetype="application/zip",
-        as_attachment=True,
-        download_name="polaroids_to_print.zip",
-    )
+        return send_file(
+            zip_buffer,
+            mimetype="application/zip",
+            as_attachment=True,
+            download_name="memories_to_print.zip",
+        )
+
+    finally:
+        # Always clean up the per-request temp directory
+        shutil.rmtree(work_dir, ignore_errors=True)
 
 
 if __name__ == "__main__":
-    ensure_dirs()
     app.run(debug=True)

@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+venv/
+.venv/
+
+# App generated folders (never commit processed files)
+temp/
+output/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
