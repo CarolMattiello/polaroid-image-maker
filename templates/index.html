@@ -1,267 +1,254 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Polaroid Maker – Print-Ready Photo Converter</title>
-  <meta name="description" content="Transform your photos into perfectly bordered, print-ready Polaroid layouts with cut marks. Upload, process, and download in seconds." />
+  <meta name="description" content="Transform your photos into print-ready Polaroid layouts with cut marks." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=DM+Sans:wght@400;500&display=swap"
+    rel="stylesheet" />
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
+
 <body>
-  <div class="bg-orbs">
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
-    <div class="orb orb-3"></div>
+
+  <!-- ── White header ─────────────────────── -->
+  <header class="header">
+    <div class="header-inner">
+      <h1>polaroid <span class="accent">maker</span></h1>
+      <p class="tagline">turn your photos into print-ready polaroid layouts, ready to cut &amp; display.</p>
+      <button class="guide-btn" id="guide-btn" aria-expanded="false" aria-controls="guide-panel">
+        how it works
+        <svg class="guide-btn__arrow" width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor"
+          stroke-width="2.2" stroke-linecap="round">
+          <polyline points="2 5 7 10 12 5" />
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ── Collapsible guide panel ───────────── -->
+  <div class="guide-panel" id="guide-panel" aria-hidden="true">
+    <div class="guide-panel__inner">
+      <ol class="guide-steps">
+        <li class="guide-step">
+          <span class="guide-step__num" style="--c: var(--accent-rose)">1</span>
+          <div><strong>upload</strong> — drop or browse photos in any size or orientation. exif rotation is corrected
+            automatically.</div>
+        </li>
+        <li class="guide-step">
+          <span class="guide-step__num" style="--c: var(--accent-amber)">2</span>
+          <div><strong>choose output</strong> — individual polaroids, an a4 print sheet (9 per page at 300 dpi), or
+            both.</div>
+        </li>
+        <li class="guide-step">
+          <span class="guide-step__num" style="--c: var(--accent-sage)">3</span>
+          <div><strong>process</strong> — each image is center-cropped to a square with 10% white border on sides &amp;
+            top, 25% chin at the bottom.</div>
+        </li>
+        <li class="guide-step">
+          <span class="guide-step__num" style="--c: var(--accent-lavender)">4</span>
+          <div><strong>print &amp; cut</strong> — grey cross marks at each corner guide your scissors for a perfect
+            trim.</div>
+        </li>
+      </ol>
+    </div>
   </div>
 
-  <main class="container">
-    <!-- Header -->
-    <header class="header">
-      <div class="logo">
-        <span class="logo-icon">📸</span>
-        <h1>Polaroid <span class="accent">Maker</span></h1>
-      </div>
-      <p class="tagline">Transform your photos into print-ready Polaroid layouts — complete with borders &amp; cut marks.</p>
-    </header>
-
-    <!-- Upload Card -->
+  <!-- ── Main / rainbow stripe area ───────── -->
+  <main class="page-wrap">
     <section class="card upload-card">
-      <div
-        id="drop-zone"
-        class="drop-zone"
-        role="button"
-        aria-label="Upload photos"
-        tabindex="0"
-      >
+
+      <!-- Drop zone -->
+      <div id="drop-zone" class="drop-zone" role="button" aria-label="Upload photos" tabindex="0">
         <div class="drop-zone__inner">
           <div class="drop-zone__icon">
-            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="17 8 12 3 7 8"/>
-              <line x1="12" y1="3" x2="12" y2="15"/>
+            <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
           </div>
-          <p class="drop-zone__label">Drag &amp; drop photos here</p>
+          <p class="drop-zone__label">drag &amp; drop photos here</p>
           <p class="drop-zone__sub">or</p>
-          <label class="btn btn--secondary" for="file-input" id="browse-label">Browse Files</label>
-          <input
-            type="file"
-            id="file-input"
-            name="images"
-            accept="image/*"
-            multiple
-            aria-label="Select photos to upload"
-          />
+          <label class="btn btn--secondary" for="file-input">browse files</label>
+          <input type="file" id="file-input" name="images" accept="image/*" multiple />
           <div id="file-badge" class="file-badge hidden">
             <span id="file-count"></span> photo(s) selected
           </div>
-          <p class="drop-zone__formats">JPG · PNG · WEBP · BMP · TIFF</p>
+          <p class="drop-zone__formats">jpg &nbsp;·&nbsp; png &nbsp;·&nbsp; webp &nbsp;·&nbsp; bmp &nbsp;·&nbsp; tiff
+          </p>
         </div>
       </div>
 
-      <!-- File list preview -->
+      <!-- File list -->
       <ul id="file-list" class="file-list" aria-label="Selected files"></ul>
+
+      <!-- Output type selector — centred -->
+      <div class="output-toggle" role="group" aria-label="Output type">
+        <span class="output-toggle__label">output</span>
+        <div class="output-toggle__options">
+          <label class="toggle-opt">
+            <input type="radio" name="layout" value="individual" checked />
+            <span>individual polaroids</span>
+          </label>
+          <label class="toggle-opt">
+            <input type="radio" name="layout" value="a4" />
+            <span>a4 print sheet</span>
+          </label>
+          <label class="toggle-opt">
+            <input type="radio" name="layout" value="both" />
+            <span>both</span>
+          </label>
+        </div>
+      </div>
 
       <!-- Process button -->
       <button id="process-btn" class="btn btn--primary btn--full" disabled>
-        <span id="btn-text">Select photos to begin</span>
+        <span id="btn-text">select photos to begin</span>
         <div id="btn-spinner" class="spinner hidden" aria-hidden="true"></div>
       </button>
 
-      <!-- Error message -->
       <div id="error-msg" class="alert alert--error hidden" role="alert"></div>
     </section>
 
-    <!-- Progress / result -->
+    <!-- Result card -->
     <section id="result-section" class="card result-card hidden" aria-live="polite">
       <div id="progress-state" class="state hidden">
         <div class="big-spinner"></div>
-        <p>Processing your photos…</p>
-        <p class="sub">This may take a moment depending on photo size.</p>
+        <p class="state-label">processing your photos&hellip;</p>
+        <p class="sub">this may take a moment depending on photo size.</p>
       </div>
       <div id="success-state" class="state hidden">
-        <div class="success-icon">✅</div>
-        <h2>Your Polaroids are ready!</h2>
-        <p class="sub">All photos have been processed with borders and cut marks.</p>
+        <div class="success-icon">✦</div>
+        <h2>your polaroids are ready</h2>
+        <p class="sub">all photos processed with borders &amp; cut marks.</p>
         <a id="download-link" href="#" class="btn btn--primary btn--download" download="polaroids_to_print.zip">
-          ⬇ Download polaroids_to_print.zip
+          download polaroids_to_print.zip
         </a>
-        <button id="reset-btn" class="btn btn--ghost">Process more photos</button>
+        <button id="reset-btn" class="btn btn--ghost">process more photos</button>
       </div>
-    </section>
-
-    <!-- How it works -->
-    <section class="card info-card">
-      <h2 class="info-card__title">How it works</h2>
-      <ol class="steps">
-        <li class="step">
-          <span class="step__num">1</span>
-          <div>
-            <strong>Upload</strong>
-            <p>Drop any photos — any size or orientation.</p>
-          </div>
-        </li>
-        <li class="step">
-          <span class="step__num">2</span>
-          <div>
-            <strong>Process</strong>
-            <p>Photos are center-cropped to a square, then a white Polaroid border is added (10% sides/top, 25% bottom chin).</p>
-          </div>
-        </li>
-        <li class="step">
-          <span class="step__num">3</span>
-          <div>
-            <strong>Print &amp; Cut</strong>
-            <p>Grey cross marks at each corner guide your scissors for a perfect trim.</p>
-          </div>
-        </li>
-      </ol>
     </section>
   </main>
 
+  <!-- ── White footer ──────────────────────── -->
   <footer class="footer">
-    <p>Polaroid Maker &mdash; print your memories ✨</p>
+    <p class="footer-copy">&copy; 2026 polaroid maker</p>
+    <nav class="footer-links" aria-label="Creator links">
+      <a href="https://carolinamattiello.vercel.app/" target="_blank" rel="noopener">portfolio</a>
+      <span class="footer-sep">&middot;</span>
+      <a href="https://www.linkedin.com/in/carolinamattiello/" target="_blank" rel="noopener">linkedin</a>
+    </nav>
   </footer>
 
   <script>
-    const dropZone    = document.getElementById('drop-zone');
-    const fileInput   = document.getElementById('file-input');
-    const processBtn  = document.getElementById('process-btn');
-    const btnText     = document.getElementById('btn-text');
-    const btnSpinner  = document.getElementById('btn-spinner');
-    const fileBadge   = document.getElementById('file-badge');
-    const fileCount   = document.getElementById('file-count');
-    const fileList    = document.getElementById('file-list');
-    const errorMsg    = document.getElementById('error-msg');
+    // ── Guide panel toggle ────────────────────
+    const guideBtn = document.getElementById('guide-btn');
+    const guidePanel = document.getElementById('guide-panel');
+    guideBtn.addEventListener('click', () => {
+      const open = guideBtn.getAttribute('aria-expanded') === 'true';
+      guideBtn.setAttribute('aria-expanded', String(!open));
+      guidePanel.setAttribute('aria-hidden', String(open));
+      guidePanel.classList.toggle('guide-panel--open', !open);
+    });
+
+    // ── File handling ─────────────────────────
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const processBtn = document.getElementById('process-btn');
+    const btnText = document.getElementById('btn-text');
+    const btnSpinner = document.getElementById('btn-spinner');
+    const fileBadge = document.getElementById('file-badge');
+    const fileCount = document.getElementById('file-count');
+    const fileListEl = document.getElementById('file-list');
+    const errorMsg = document.getElementById('error-msg');
     const resultSection = document.getElementById('result-section');
     const progressState = document.getElementById('progress-state');
-    const successState  = document.getElementById('success-state');
-    const downloadLink  = document.getElementById('download-link');
-    const resetBtn      = document.getElementById('reset-btn');
+    const successState = document.getElementById('success-state');
+    const downloadLink = document.getElementById('download-link');
+    const resetBtn = document.getElementById('reset-btn');
 
     let selectedFiles = [];
 
-    // ── Drag & drop ──────────────────────────────────────────
     ['dragenter', 'dragover'].forEach(evt =>
       dropZone.addEventListener(evt, e => { e.preventDefault(); dropZone.classList.add('drop-zone--active'); })
     );
     ['dragleave', 'drop'].forEach(evt =>
       dropZone.addEventListener(evt, e => { e.preventDefault(); dropZone.classList.remove('drop-zone--active'); })
     );
-    dropZone.addEventListener('drop', e => {
-      handleFiles([...e.dataTransfer.files]);
-    });
-    dropZone.addEventListener('click', e => {
-      if (e.target.id !== 'browse-label') fileInput.click();
-    });
-    dropZone.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
-    });
-    fileInput.addEventListener('change', () => {
-      handleFiles([...fileInput.files]);
-    });
+    dropZone.addEventListener('drop', e => handleFiles([...e.dataTransfer.files]));
+    dropZone.addEventListener('click', e => { if (!e.target.closest('label')) fileInput.click(); });
+    dropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
+    fileInput.addEventListener('change', () => handleFiles([...fileInput.files]));
 
-    function handleFiles(files) {
-      const images = files.filter(f => f.type.startsWith('image/'));
-      if (!images.length) {
-        showError('Please select at least one image file.');
-        return;
-      }
+    function handleFiles(incoming) {
+      const imgs = incoming.filter(f => f.type.startsWith('image/'));
+      if (!imgs.length) { showError('please select at least one image file.'); return; }
       clearError();
-      selectedFiles = images;
+      imgs.forEach(f => { if (!selectedFiles.find(x => x.name === f.name && x.size === f.size)) selectedFiles.push(f); });
       updateFileUI();
     }
 
-    function updateFileUI() {
-      const count = selectedFiles.length;
-      fileBadge.classList.toggle('hidden', count === 0);
-      fileCount.textContent = count;
+    function removeFile(i) { selectedFiles.splice(i, 1); updateFileUI(); }
 
-      fileList.innerHTML = '';
-      selectedFiles.forEach(f => {
+    function updateFileUI() {
+      const n = selectedFiles.length;
+      fileBadge.classList.toggle('hidden', n === 0);
+      fileCount.textContent = n;
+      fileListEl.innerHTML = '';
+      selectedFiles.forEach((f, i) => {
         const li = document.createElement('li');
         li.className = 'file-list__item';
-        li.innerHTML = `<span class="file-list__icon">🖼</span><span class="file-list__name">${escapeHtml(f.name)}</span><span class="file-list__size">${formatSize(f.size)}</span>`;
-        fileList.appendChild(li);
+        li.innerHTML = `<span class="file-list__icon">🖼</span><span class="file-list__name">${esc(f.name)}</span><span class="file-list__size">${fmt(f.size)}</span><button class="remove-btn" data-index="${i}" aria-label="Remove">×</button>`;
+        fileListEl.appendChild(li);
       });
-
-      processBtn.disabled = count === 0;
-      btnText.textContent = count > 0 ? `Process ${count} photo${count > 1 ? 's' : ''}` : 'Select photos to begin';
+      fileListEl.querySelectorAll('.remove-btn').forEach(b =>
+        b.addEventListener('click', () => removeFile(Number(b.dataset.index)))
+      );
+      processBtn.disabled = n === 0;
+      btnText.textContent = n > 0 ? `process ${n} photo${n > 1 ? 's' : ''}` : 'select photos to begin';
     }
 
-    // ── Upload & process ─────────────────────────────────────
     processBtn.addEventListener('click', async () => {
       if (!selectedFiles.length) return;
-      setLoading(true);
-      clearError();
-      showSection('progress');
-
-      const formData = new FormData();
-      selectedFiles.forEach(f => formData.append('images', f));
-
+      setLoading(true); clearError(); showSection('progress');
+      const fd = new FormData();
+      selectedFiles.forEach(f => fd.append('images', f));
+      fd.append('layout', document.querySelector('input[name="layout"]:checked').value);
       try {
-        const response = await fetch('/upload', { method: 'POST', body: formData });
-
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          throw new Error(data.error || `Server error ${response.status}`);
-        }
-
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        downloadLink.href = url;
+        const res = await fetch('/upload', { method: 'POST', body: fd });
+        if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || `server error ${res.status}`); }
+        downloadLink.href = URL.createObjectURL(await res.blob());
         showSection('success');
-      } catch (err) {
-        showSection('none');
-        showError(err.message || 'An unexpected error occurred.');
-      } finally {
-        setLoading(false);
-      }
+      } catch (err) { showSection('none'); showError(err.message || 'an unexpected error occurred.'); }
+      finally { setLoading(false); }
     });
 
     resetBtn.addEventListener('click', () => {
-      selectedFiles = [];
-      fileInput.value = '';
-      updateFileUI();
-      showSection('none');
-      clearError();
+      selectedFiles = []; fileInput.value = '';
+      updateFileUI(); showSection('none'); clearError();
     });
 
-    // ── Helpers ───────────────────────────────────────────────
     function setLoading(on) {
       processBtn.disabled = on;
       btnSpinner.classList.toggle('hidden', !on);
-      btnText.textContent = on ? 'Processing…' : `Process ${selectedFiles.length} photo${selectedFiles.length > 1 ? 's' : ''}`;
+      btnText.textContent = on ? 'processing\u2026' : `process ${selectedFiles.length} photo${selectedFiles.length > 1 ? 's' : ''}`;
     }
-
-    function showSection(state) {
-      resultSection.classList.toggle('hidden', state === 'none');
-      progressState.classList.toggle('hidden', state !== 'progress');
-      successState.classList.toggle('hidden', state !== 'success');
+    function showSection(s) {
+      resultSection.classList.toggle('hidden', s === 'none');
+      progressState.classList.toggle('hidden', s !== 'progress');
+      successState.classList.toggle('hidden', s !== 'success');
     }
-
-    function showError(msg) {
-      errorMsg.textContent = msg;
-      errorMsg.classList.remove('hidden');
-    }
-
-    function clearError() {
-      errorMsg.classList.add('hidden');
-      errorMsg.textContent = '';
-    }
-
-    function formatSize(bytes) {
-      if (bytes < 1024) return bytes + ' B';
-      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-    }
-
-    function escapeHtml(str) {
-      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    }
+    function showError(m) { errorMsg.textContent = m; errorMsg.classList.remove('hidden'); }
+    function clearError() { errorMsg.classList.add('hidden'); errorMsg.textContent = ''; }
+    function fmt(b) { if (b < 1024) return b + ' B'; if (b < 1048576) return (b / 1024).toFixed(1) + ' KB'; return (b / 1048576).toFixed(1) + ' MB'; }
+    function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
   </script>
 </body>
+
 </html>

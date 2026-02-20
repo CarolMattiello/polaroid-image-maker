@@ -9,10 +9,21 @@ from PIL import Image, ImageOps, ImageDraw
 
 app = Flask(__name__)
 
-TEMP_DIR = os.path.join(os.path.dirname(__file__), "temp")
+TEMP_DIR   = os.path.join(os.path.dirname(__file__), "temp")
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "output")
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif"}
+
+# ── A4 layout constants (300 DPI) ──────────────────────────────
+A4_W, A4_H   = 2480, 3508  # pixels at 300 DPI
+A4_MARGIN    = 100          # px, all sides
+A4_GAP       = 40           # px between polaroids
+A4_COLS      = 3
+# Each polaroid width in the grid:
+A4_POL_W = (A4_W - 2 * A4_MARGIN - (A4_COLS - 1) * A4_GAP) // A4_COLS   # ≈ 733 px
+# Height: ratio 1.35/1.2 = 1.125
+A4_POL_H = round(A4_POL_W * (1.35 / 1.2))                                 # ≈ 825 px
+A4_ROWS  = (A4_H - 2 * A4_MARGIN + A4_GAP) // (A4_POL_H + A4_GAP)        # ≈ 3 rows
 
 
 def allowed_file(filename: str) -> bool:
@@ -20,62 +31,57 @@ def allowed_file(filename: str) -> bool:
 
 
 def make_polaroid(img: Image.Image) -> Image.Image:
-    """Apply the Polaroid transformation to a PIL Image."""
-    # 1. Respect EXIF orientation
-    img = ImageOps.exif_transpose(img)
+    """Return a Polaroid-bordered PIL Image (in memory)."""
+    img = ImageOps.exif_transpose(img).convert("RGB")
 
-    # Convert to RGB (handles RGBA, palette, etc.)
-    img = img.convert("RGB")
-
-    # 2. Center-crop to square (shortest side)
+    # Square center-crop
     min_side = min(img.width, img.height)
-    left = (img.width - min_side) // 2
-    top = (img.height - min_side) // 2
-    img = img.crop((left, top, left + min_side, top + min_side))
+    left = (img.width  - min_side) // 2
+    top  = (img.height - min_side) // 2
+    img  = img.crop((left, top, left + min_side, top + min_side))
+    S    = min_side
 
-    S = min_side  # square side length
-
-    # 3. Build canvas
-    #   Width  = S + 0.2*S = 1.2*S   (10% left + 10% right)
-    #   Height = S + 0.35*S = 1.35*S (10% top  + 25% bottom)
+    # Canvas: 1.2W × 1.35H
     canvas_w = round(S * 1.2)
     canvas_h = round(S * 1.35)
-    canvas = Image.new("RGB", (canvas_w, canvas_h), color=(255, 255, 255))
+    canvas   = Image.new("RGB", (canvas_w, canvas_h), (255, 255, 255))
+    canvas.paste(img, (round(S * 0.1), round(S * 0.1)))
 
-    paste_x = round(S * 0.1)
-    paste_y = round(S * 0.1)
-    canvas.paste(img, (paste_x, paste_y))
-
-    # 4. Draw grey cross cut-marks at each corner
-    draw = ImageDraw.Draw(canvas)
-    cross_color = (128, 128, 128)  # #808080
-    span = 10  # 10 px in each direction → total 20 px span
-
-    corners = [
-        (0, 0),
-        (canvas_w - 1, 0),
-        (0, canvas_h - 1),
-        (canvas_w - 1, canvas_h - 1),
-    ]
-    for cx, cy in corners:
-        # Horizontal bar of the cross
-        draw.line(
-            [(max(0, cx - span), cy), (min(canvas_w - 1, cx + span), cy)],
-            fill=cross_color,
-            width=1,
-        )
-        # Vertical bar of the cross
-        draw.line(
-            [(cx, max(0, cy - span)), (cx, min(canvas_h - 1, cy + span))],
-            fill=cross_color,
-            width=1,
-        )
+    # Grey cross cut-marks at each corner
+    draw        = ImageDraw.Draw(canvas)
+    cross_color = (128, 128, 128)
+    span        = 10
+    for cx, cy in [(0, 0), (canvas_w - 1, 0), (0, canvas_h - 1), (canvas_w - 1, canvas_h - 1)]:
+        draw.line([(max(0, cx - span), cy), (min(canvas_w - 1, cx + span), cy)], fill=cross_color, width=1)
+        draw.line([(cx, max(0, cy - span)), (cx, min(canvas_h - 1, cy + span))], fill=cross_color, width=1)
 
     return canvas
 
 
+def make_a4_pages(polaroids: list) -> list:
+    """Arrange polaroid images on A4 canvases (list of PIL Images)."""
+    per_page = A4_COLS * A4_ROWS
+    pages = []
+
+    for page_start in range(0, len(polaroids), per_page):
+        page_pols = polaroids[page_start : page_start + per_page]
+        canvas = Image.new("RGB", (A4_W, A4_H), (255, 255, 255))
+
+        for idx, pol in enumerate(page_pols):
+            col = idx % A4_COLS
+            row = idx // A4_COLS
+            x   = A4_MARGIN + col * (A4_POL_W + A4_GAP)
+            y   = A4_MARGIN + row * (A4_POL_H + A4_GAP)
+            resized = pol.resize((A4_POL_W, A4_POL_H), Image.LANCZOS)
+            canvas.paste(resized, (x, y))
+
+        pages.append(canvas)
+
+    return pages
+
+
 def ensure_dirs():
-    os.makedirs(TEMP_DIR, exist_ok=True)
+    os.makedirs(TEMP_DIR,   exist_ok=True)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
@@ -95,51 +101,61 @@ def index():
 def upload():
     ensure_dirs()
 
-    files = request.files.getlist("images")
+    files  = request.files.getlist("images")
+    layout = request.form.get("layout", "individual")  # individual | a4 | both
+
     if not files or all(f.filename == "" for f in files):
         return jsonify({"error": "No files uploaded."}), 400
 
-    processed_paths = []
+    polaroids_mem = []  # list of (base_name, PIL Image)
 
     for f in files:
         if not allowed_file(f.filename):
             continue
 
-        # Save to temp
-        ext = f.filename.rsplit(".", 1)[1].lower()
-        temp_name = f"{uuid.uuid4().hex}.{ext}"
-        temp_path = os.path.join(TEMP_DIR, temp_name)
+        ext       = f.filename.rsplit(".", 1)[1].lower()
+        temp_path = os.path.join(TEMP_DIR, f"{uuid.uuid4().hex}.{ext}")
         f.save(temp_path)
 
         try:
             with Image.open(temp_path) as img:
                 polaroid = make_polaroid(img)
-
-            # Save processed image (always as JPEG for print-readiness)
             base = os.path.splitext(f.filename)[0]
-            out_name = f"{base}_polaroid.jpg"
-            out_path = os.path.join(OUTPUT_DIR, out_name)
-
-            # Handle filename collisions
-            counter = 1
-            while os.path.exists(out_path):
-                out_name = f"{base}_polaroid_{counter}.jpg"
-                out_path = os.path.join(OUTPUT_DIR, out_name)
-                counter += 1
-
-            polaroid.save(out_path, "JPEG", quality=95)
-            processed_paths.append(out_path)
+            polaroids_mem.append((base, polaroid))
         except Exception as e:
             app.logger.error(f"Failed to process {f.filename}: {e}")
 
-    if not processed_paths:
+    if not polaroids_mem:
         cleanup_dirs()
         return jsonify({"error": "No valid images could be processed."}), 422
 
-    # Build ZIP in memory
+    output_paths = []
+
+    # ── Individual Polaroid JPEGs ──────────────────────────────
+    if layout in ("individual", "both"):
+        for base, pol in polaroids_mem:
+            out_name = f"{base}_polaroid.jpg"
+            out_path = os.path.join(OUTPUT_DIR, out_name)
+            counter  = 1
+            while os.path.exists(out_path):
+                out_path = os.path.join(OUTPUT_DIR, f"{base}_polaroid_{counter}.jpg")
+                counter += 1
+            pol.save(out_path, "JPEG", quality=95)
+            output_paths.append(out_path)
+
+    # ── A4 print sheets ────────────────────────────────────────
+    if layout in ("a4", "both"):
+        pil_list = [pol for _, pol in polaroids_mem]
+        a4_pages = make_a4_pages(pil_list)
+        for i, page in enumerate(a4_pages, 1):
+            out_path = os.path.join(OUTPUT_DIR, f"a4_page_{i:02d}.jpg")
+            page.save(out_path, "JPEG", quality=95)
+            output_paths.append(out_path)
+
+    # ── ZIP and send ───────────────────────────────────────────
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        for path in processed_paths:
+        for path in output_paths:
             zf.write(path, arcname=os.path.basename(path))
     zip_buffer.seek(0)
 
