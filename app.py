@@ -146,7 +146,7 @@ def upload():
             zip_buffer,
             mimetype="application/zip",
             as_attachment=True,
-            download_name="polaroids_to_print.zip",
+            download_name="memories_to_print.zip",
         )
 
     finally:
