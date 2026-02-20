@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Rose background -->
+  <rect width="32" height="32" rx="6" fill="#c07878"/>
+  <!-- White photo card (image area + chin below) -->
+  <rect x="6" y="5" width="20" height="22" rx="2" fill="white"/>
+  <!-- Tinted image area (top portion) -->
+  <rect x="6" y="5" width="20" height="15" rx="2" fill="#f0d8d8"/>
+</svg>
