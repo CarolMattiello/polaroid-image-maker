@@ -159,8 +159,8 @@ h1 .accent {
 }
 
 .guide-panel--open {
-  max-height: 400px;
-  /* large enough, transition clips to content */
+  max-height: 900px;
+  /* tall enough for 4 steps stacked in a single column on mobile */
 }
 
 .guide-panel__inner {
@@ -704,6 +704,18 @@ input[type="file"] {
 
 /* ── Responsive ──────────────────────────────── */
 @media (max-width: 640px) {
+
+  /* Thinner stripes on mobile — 55px each so all 6 colours fit on screen */
+  body {
+    background: repeating-linear-gradient(to right,
+        var(--stripe-rose) 0px, var(--stripe-rose) 55px,
+        var(--stripe-orange) 55px, var(--stripe-orange) 110px,
+        var(--stripe-yellow) 110px, var(--stripe-yellow) 165px,
+        var(--stripe-green) 165px, var(--stripe-green) 220px,
+        var(--stripe-blue) 220px, var(--stripe-blue) 275px,
+        var(--stripe-violet) 275px, var(--stripe-violet) 330px);
+  }
+
   .guide-steps {
     grid-template-columns: 1fr 1fr;
   }
