@@ -117,7 +117,7 @@ def upload():
 
         output_paths = []
 
-        if layout in ("individual", "both"):
+        if layout in ("individual", "both", "both_pdf"):
             for base, pol in polaroids_mem:
                 out_name = f"{base}_polaroid.jpg"
                 out_path = os.path.join(output_dir, out_name)
@@ -128,13 +128,21 @@ def upload():
                 pol.save(out_path, "JPEG", quality=95)
                 output_paths.append(out_path)
 
-        if layout in ("a4", "both"):
+        if layout in ("a4", "a4_pdf", "both", "both_pdf"):
             pil_list = [pol for _, pol in polaroids_mem]
             a4_pages = make_a4_pages(pil_list)
-            for i, page in enumerate(a4_pages, 1):
-                out_path = os.path.join(output_dir, f"a4_page_{i:02d}.jpg")
-                page.save(out_path, "JPEG", quality=95)
-                output_paths.append(out_path)
+
+            if layout in ("a4", "both"):
+                for i, page in enumerate(a4_pages, 1):
+                    out_path = os.path.join(output_dir, f"a4_page_{i:02d}.jpg")
+                    page.save(out_path, "JPEG", quality=95)
+                    output_paths.append(out_path)
+
+            if layout in ("a4_pdf", "both_pdf"):
+                if a4_pages:
+                    pdf_path = os.path.join(output_dir, "a4_pages.pdf")
+                    a4_pages[0].save(pdf_path, "PDF", resolution=300.0, save_all=True, append_images=a4_pages[1:])
+                    output_paths.append(pdf_path)
 
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:

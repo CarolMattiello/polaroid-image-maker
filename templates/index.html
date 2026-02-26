@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
   <link rel="icon" type="image/svg+xml"
     href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23c07878'/><rect x='6' y='5' width='20' height='22' rx='2' fill='white'/><rect x='6' y='5' width='20' height='15' rx='2' fill='%23f0d8d8'/></svg>" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 
 <body>
@@ -45,7 +46,7 @@
         </li>
         <li class="guide-step">
           <span class="guide-step__num" style="--c: var(--accent-amber)">2</span>
-          <div><strong>choose output</strong> — individual prints, an a4 print sheet (9 per page at 300 dpi), or both.
+          <div><strong>choose output</strong> — individual prints, an a4 print sheet (img or pdf), or both.
           </div>
         </li>
         <li class="guide-step">
@@ -102,11 +103,19 @@
           </label>
           <label class="toggle-opt">
             <input type="radio" name="layout" value="a4" />
-            <span>a4 print sheet</span>
+            <span>a4 sheet (img)</span>
+          </label>
+          <label class="toggle-opt">
+            <input type="radio" name="layout" value="a4_pdf" />
+            <span>a4 sheet (pdf)</span>
           </label>
           <label class="toggle-opt">
             <input type="radio" name="layout" value="both" />
-            <span>both</span>
+            <span>both (img)</span>
+          </label>
+          <label class="toggle-opt">
+            <input type="radio" name="layout" value="both_pdf" />
+            <span>both (pdf)</span>
           </label>
         </div>
       </div>
@@ -132,8 +141,12 @@
         <h2>your memories are ready</h2>
         <p class="sub">all photos processed with frames &amp; cut marks.</p>
         <a id="download-link" href="#" class="btn btn--primary btn--download" download="memories_to_print.zip">
-          download memories_to_print.zip
+          download as zip
         </a>
+        <div id="separate-files-wrap" class="hidden" style="width: 100%; margin-top: 10px;">
+          <p class="sub" style="margin-bottom: 12px; font-size: 0.9rem;">or download separately:</p>
+          <div id="separate-files-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        </div>
         <button id="reset-btn" class="btn btn--ghost">process more photos</button>
       </div>
     </section>
@@ -226,7 +239,41 @@
       try {
         const res = await fetch('/upload', { method: 'POST', body: fd });
         if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || `server error ${res.status}`); }
-        downloadLink.href = URL.createObjectURL(await res.blob());
+        const blob = await res.blob();
+        downloadLink.href = URL.createObjectURL(blob);
+
+        // Use JSZip to offer individual files
+        const separateFilesWrap = document.getElementById('separate-files-wrap');
+        const separateFilesList = document.getElementById('separate-files-list');
+        separateFilesList.innerHTML = '';
+        separateFilesWrap.classList.add('hidden');
+
+        try {
+          const zip = await JSZip.loadAsync(blob);
+          const fileNames = Object.keys(zip.files);
+          if (fileNames.length > 0) {
+            separateFilesWrap.classList.remove('hidden');
+            fileNames.forEach(relativePath => {
+              const file = zip.files[relativePath];
+              if (!file.dir) {
+                file.async("blob").then(function (fileBlob) {
+                  const url = URL.createObjectURL(fileBlob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = relativePath;
+                  a.textContent = relativePath;
+                  a.className = "btn btn--secondary";
+                  a.style.padding = "10px";
+                  a.style.fontSize = "0.85rem";
+                  separateFilesList.appendChild(a);
+                });
+              }
+            });
+          }
+        } catch (zipErr) {
+          console.error("Could not parse ZIP to generate separate files", zipErr);
+        }
+
         showSection('success');
       } catch (err) { showSection('none'); showError(err.message || 'an unexpected error occurred.'); }
       finally { setLoading(false); }
